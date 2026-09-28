@@ -6,7 +6,7 @@ import os
 
 app = Flask(__name__)
 metrics = PrometheusMetrics(app)
-model = joblib.load("model.joblib")
+model = joblib.load("src/model.joblib")
 VERSION = os.environ.get("MODEL_VERSION", "unknown")
 
 @app.route("/predict", methods=["POST"])
