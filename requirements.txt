@@ -3,3 +3,4 @@ scikit-learn
 numpy
 joblib
 prometheus-flask-exporter
+pandas
