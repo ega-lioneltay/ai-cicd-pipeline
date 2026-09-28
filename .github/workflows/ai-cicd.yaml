@@ -1,0 +1,67 @@
+name: AI Model CI/CD
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  data-and-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install dvc pytest pip-audit
+      - name: Run data pipeline
+        run: python src/data_pipeline.py
+      - name: Dependency security scan
+        run: pip-audit -r requirements.txt
+      - name: Unit tests
+        run: pytest tests/test_unit.py -v
+      - name: Integration tests
+        run: pytest tests/test_integration.py -v
+
+  train-and-validate:
+    needs: data-and-tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"
+      - name: Install dependencies
+        run: pip install -r requirements.txt mlflow scikit-learn joblib
+      - name: Train model
+        run: python src/data_pipeline.py && python src/train.py
+      - name: Performance and adversarial tests
+        run: |
+          pip install pytest
+          pytest tests/test_performance.py tests/test_adversarial.py -v
+      - name: Upload model artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: trained-model
+          path: src/model.joblib
+
+  build-and-push-image:
+    needs: train-and-validate
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: trained-model
+          path: src/
+      - name: Log in to GitHub Container Registry
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+      - name: Build and push image
+        run: |
+          docker build -t ghcr.io/${{ github.repository }}/model:${{ github.sha }} .
+          docker push ghcr.io/${{ github.repository }}/model:${{ github.sha }}
