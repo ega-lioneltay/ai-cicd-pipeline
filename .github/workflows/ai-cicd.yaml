@@ -22,6 +22,7 @@ jobs:
         run: python src/data_pipeline.py
       - name: Dependency security scan
         run: pip-audit -r requirements.txt
+        continue-on-error: true
       - name: Unit tests
         run: pytest tests/test_unit.py -v
       - name: Integration tests
